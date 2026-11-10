@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Laser Run" />
+<meta name="theme-color" content="#0f172a" />
+<title>Laser Run Chrono</title>
+<style>
+  :root { -webkit-tap-highlight-color: transparent; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #0f172a; color: #e2e8f0;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: env(safe-area-inset-top) 12px calc(16px + env(safe-area-inset-bottom));
+    user-select: none; -webkit-user-select: none;
+  }
+  h1 { font-size: 18px; letter-spacing: 2px; color: #38bdf8; margin: 8px 0 2px; text-transform: uppercase; }
+  .subtitle { font-size: 12px; color: #64748b; margin-bottom: 10px; }
+  .runner-card {
+    display: flex; gap: 8px; width: 100%; max-width: 480px; margin-bottom: 8px;
+  }
+  .runner-card select {
+    flex: 1; border: none; border-radius: 12px; padding: 12px;
+    background: #1e293b; color: #e2e8f0; font-size: 16px; font-weight: 600;
+    font-family: inherit; outline: none;
+  }
+  #reloadRunnersBtn {
+    width: auto; max-width: none; background: #475569; border-radius: 12px;
+    padding: 0 16px; font-size: 20px; color: #e2e8f0;
+  }
+  #chrono {
+    font-variant-numeric: tabular-nums;
+    font-size: 50px; font-weight: 700; text-align: center;
+    margin: 6px 0 2px; color: #f8fafc;
+  }
+  #chrono.small { font-size: 32px; }
+  button {
+    border: none; border-radius: 14px; font-weight: 700; cursor: pointer;
+    font-family: inherit; color: #fff; width: 100%; max-width: 480px;
+  }
+  #startBtn { background: #22c55e; padding: 22px; font-size: 24px; margin: 6px 0; }
+  #startBtn:active { background: #16a34a; }
+  .row { display: flex; gap: 8px; width: 100%; max-width: 480px; }
+  .row button { flex: 1; }
+  #pauseBtn { background: #475569; padding: 14px; font-size: 16px; }
+  #resetBtn { background: #7f1d1d; padding: 12px; font-size: 15px; margin-top: 6px; }
+  #checks {
+    width: 100%; max-width: 480px; margin-top: 8px;
+    display: flex; flex-direction: column; gap: 8px;
+    max-height: 58vh; overflow-y: auto; padding: 2px;
+  }
+  .check {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 14px 10px; border-radius: 16px; font-size: 20px;
+    letter-spacing: 1px; background: #475569; color: #94a3b8;
+    font-variant-numeric: tabular-nums; transition: background .15s;
+  }
+  .check .hint { font-size: 12px; font-weight: 500; letter-spacing: 0; color: inherit; opacity: .75; }
+  .check .info { font-size: 17px; font-weight: 800; color: #22c55e; letter-spacing: 0; }
+  .check .info .na { color: #94a3b8; font-weight: 600; }
+  .check .time { font-size: 13px; opacity: .8; }
+  /* Point facultatif (informatif) : bleu plus clair */
+  .check.info-btn { background: #155e75; color: #bae6fd; }
+  /* Point obligatoire courant : orange (en attente de pression) */
+  .check.current {
+    background: #f97316; color: #1c1917; font-size: 24px; padding: 22px 10px;
+    box-shadow: 0 0 18px rgba(249,115,22,.5);
+  }
+  .check.current:active { background: #ea580c; }
+  /* Point facultatif courant : bleu clair */
+  .check.info-btn.current { background: #7dd3fc; box-shadow: 0 0 14px rgba(125,211,252,.4); }
+  /* Point press&eacute; */
+  .check.pressed { background: #14532d; color: #e2e8f0; box-shadow: none; }
+  #history { display: none; width: 100%; max-width: 480px; margin-top: 8px; background: #1e293b; box-shadow: 0 4px 14px rgba(0,0,0,.4); border-radius: 12px; padding: 12px; }
+  #history h2 { font-size: 14px; color: #94a3b8; margin-bottom: 6px; }
+  .hist { display: flex; justify-content: space-between; font-size: 13px; color: #cbd5e1; padding: 6px 10px; background: #162032; border-radius: 8px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .legend { font-size: 11px; color: #475569; margin-top: 10px; text-align: center; max-width: 480px; }
+  /* Fen&ecirc;tre modale bar&egrave;mes */
+  #modalOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    z-index: 50; padding: 16px; overflow-y: auto;
+  }
+  #modalOverlay.open { display: flex; align-items: flex-start; justify-content: center; }
+  #modalBox {
+    background: #f8fafc; color: #0f172a; border-radius: 16px; padding: 16px;
+    max-width: 520px; width: 100%;
+  }
+  #modalBox h3 { font-size: 16px; margin: 10px 0 6px; }
+  #modalBox table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
+  #modalBox th, #modalBox td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: center; }
+  #modalBox th { background: #e2e8f0; }
+  #modalClose { background: #7f1d1d; padding: 12px; font-size: 15px; margin-top: 6px; }
+  /* R&eacute;capitulatif imprimable */
+  #recapPrint {
+    background: #fff; color: #000; border-radius: 16px; padding: 18px;
+    max-width: 520px; width: 100%; font-size: 14px;
+  }
+  #recapPrint h2 { font-size: 20px; text-align: center; margin-bottom: 2px; }
+  #recapPrint .sub { text-align: center; color: #475569; margin-bottom: 10px; }
+  #recapPrint table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+  #recapPrint th, #recapPrint td { border: 1px solid #cbd5e1; padding: 3px 5px; text-align: left; }
+  #recapPrint th { background: #e2e8f0; }
+  @media print {
+    body.printing > *:not(#recapPrint) { display: none !important; }
+    body.printing { background: #fff !important; padding: 0 !important; }
+    #recapPrint { border-radius: 0; max-width: none; padding: 0; }
+    #recapClose { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<h1>Laser Run</h1>
+<div class="subtitle">Prologue 45 m &middot; 3 &times; (Tir + 385 m)</div>
+
+<div class="runner-card">
+  <select id="runnerSel"><option>Chargement des coureurs…</option></select>
+  <button id="reloadRunnersBtn" title="Recharger la liste">&#8635;</button>
+</div>
+
+<div id="chrono" class="small">00'00''0</div>
+
+<button id="startBtn">D&Eacute;PART</button>
+<div class="row">
+  <button id="pauseBtn" style="display:none">Arr&ecirc;t de l'&eacute;preuve</button>
+  <button id="resetBtn">Reset</button>
+</div>
+<div class="row" style="margin-top:8px">
+  <button id="baremeBtn" style="background:#334155">Bar&egrave;mes</button>
+  <button id="recapBtn" style="background:#334155">Stats de la course en PDF</button>
+</div>
+
+<div id="checks"></div>
+
+<div id="modalOverlay">
+  <div id="modalBox"></div>
+</div>
+
+<div id="history"></div>
+<div id="sendStatus" style="display:none; width:100%; max-width:480px; margin-top:6px; font-size:13px; font-weight:700; text-align:center;"></div>
+
+<div class="legend">
+  Points obligatoires (ET, ST, Arriv&eacute;e) : &agrave; presser dans l'ordre.
+  Points informatifs (C#-###m, bleu clair) : facultatifs &mdash; en cas d'oubli, la vitesse
+  du tron&ccedil;on suivant ne peut pas &ecirc;tre calcul&eacute;e.
+</div>
+
+<script>
+(function () {
+  // Google Sheet des coureurs : onglet "liste pour laserrunchronotir".
+  // Point d'acc&egrave;s gviz (JSON) : contrairement &agrave; l'export CSV, il autorise CORS.
+  var SHEET_ID = "1sSqK_mbX5lklatStGkw-umrig7GGHO4CYxo2UpohDtM";
+  var SHEET_NAME = "liste pour laserrunchronotir";
+  var RUNNERS_JSON_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID +
+    "/gviz/tq?tqx=out:json&sheet=" + encodeURIComponent(SHEET_NAME);
+
+  var runnerSel = document.getElementById("runnerSel");
+  var reloadRunnersBtn = document.getElementById("reloadRunnersBtn");
+  var runners = [];
+
+  function csvToLines(csv) {
+    var rows = [];
+    var cur = "", inQ = false;
+    for (var i = 0; i < csv.length; i++) {
+      var ch = csv[i];
+      if (inQ) {
+        if (ch === '"') { if (csv[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+        else cur += ch;
+      } else if (ch === '"') inQ = true;
+      else if (ch === "\r") { }
+      else if (ch === "\n") { rows.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    if (cur) rows.push(cur);
+    return rows;
+  }
+
+  function populateRunners(list, fromCache) {
+    runners = list;
+    var sel = runnerSel;
+    var prev = sel.value;
+    sel.innerHTML = "";
+    var opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "— Coureur non renseign\u00e9 —";
+    sel.appendChild(opt0);
+    list.forEach(function (n) {
+      var o = document.createElement("option");
+      o.value = o.textContent = n;
+      sel.appendChild(o);
+    });
+    if (list.indexOf(prev) >= 0) sel.value = prev;
+    if (fromCache && list.length) reloadRunnersBtn.style.outline = "2px solid #f97316";
+    else reloadRunnersBtn.style.outline = "none";
+  }
+
+  function gvizToNames(text) {
+    var m = text.match(/setResponse\(([\s\S]*)\);?\s*$/);
+    if (!m) throw new Error("format inattendu");
+    var data = JSON.parse(m[1]);
+    var names = [];
+    (data.table && data.table.rows || []).forEach(function (r) {
+      var cell = r.c && r.c[0];
+      var v = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : cell.f) : null;
+      if (v === null || v === undefined) return;
+      v = String(v).trim();
+      if (v && v.toUpperCase() !== "NOM" && v.toUpperCase() !== "NOMS") names.push(v);
+    });
+    return names;
+  }
+
+  function loadRunners() {
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem("lr_runners") || "null"); } catch (e) {}
+    if (cached && cached.length) populateRunners(cached, true);
+    fetch(RUNNERS_JSON_URL, { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+      .then(function (text) {
+        var names = gvizToNames(text);
+        populateRunners(names, false);
+        try { localStorage.setItem("lr_runners", JSON.stringify(names)); } catch (e) {}
+      })
+      .catch(function () {
+        if (!cached || !cached.length) {
+          runnerSel.innerHTML = "";
+          var o = document.createElement("option");
+          o.textContent = "Liste indisponible (vérifiez la connexion)";
+          runnerSel.appendChild(o);
+        }
+      });
+  }
+  reloadRunnersBtn.addEventListener("click", loadRunners);
+
+  function kmh(distanceM, durationMs) {
+    if (durationMs <= 0) return 0;
+    return (distanceM / 1000) / (durationMs / 3600000);
+  }
+  function fmt1(n) { return (Math.round(n * 10) / 10).toFixed(1).replace(".", ","); }
+  function fmtDur(ms) {
+    var s = Math.floor(ms / 1000);
+    var m = Math.floor(s / 60); s = s % 60;
+    return m + "'" + (s < 10 ? "0" : "") + s + "''";
+  }
+  function fmtNote(n) { return String(n).replace(".", ","); }
+
+  // ---- Bar&egrave;me chrono de la course globale (temps en secondes -> note /6) ----
+  // note = meilleure note dont le seuil est >= temps r&eacute;alis&eacute; ; plus lent que le 1er seuil : 0
+  var BAREME_COURSE = {
+    garcons: [[575,0.25],[561,0.5],[547,0.75],[533,1],[523,1.25],[513,1.5],[505,1.75],
+              [497,2],[489,2.25],[481,2.5],[473,2.75],[465,3],[460,3.25],[456,3.5],
+              [452,3.75],[448,4],[444,4.25],[440,4.5],[437,4.75],[434,5],[430,5.25],
+              [427,5.5],[423,5.75],[420,6]],
+    filles:  [[705,0.25],[691,0.5],[673,0.75],[656,1],[639,1.25],[624,1.5],[610,1.75],
+              [597,2],[584,2.25],[568,2.5],[557,2.75],[547,3],[537,3.25],[531,3.5],
+              [525,3.75],[516,4],[510,4.25],[502,4.5],[497,4.75],[492,5],[487,5.25],
+              [482,5.5],[478,5.75],[473,6]]
+  };
+  function noteCourse(ms, sexe) {
+    var t = ms / 1000;
+    var b = BAREME_COURSE[sexe === "fille" ? "filles" : "garcons"];
+    var note = 0;
+    for (var i = 0; i < b.length; i++) {
+      if (t <= b[i][0]) note = b[i][1]; // seuils d&eacute;croissants : on garde la meilleure note atteinte
+    }
+    return note;
+  }
+
+  // ---- Bar&egrave;me efficacit&eacute; du tir (moyenne des 3 tirs + &eacute;cart max) ----
+  // Degr&eacute; selon la moyenne des 3 tirs ; note selon l'&eacute;cart max
+  // (&eacute;cart = (tir le plus lent - tir le plus rapide) / tir le plus rapide, en %)
+  var BAREME_TIR = {
+    D1: { over60: 0.25, steps: [[60,0.5],[30,0.75],[20,1],[15,1.25],[0,1.25]] },   // Moy > 1'05
+    D2: { over60: 1.5,  steps: [[60,1.75],[40,2],[30,2.25],[20,2.5],[15,2.75],[0,2.75]] }, // 0'51 <= Moy <= 1'05
+    D3: { over60: 3,    steps: [[60,3.25],[40,3.5],[30,3.75],[20,4],[15,4.25],[0,4.25]] }, // 0'41 <= Moy <= 0'50
+    D4: { over60: 4.5,  steps: [[60,4.75],[40,5],[30,5.25],[20,5.5],[15,5.75],[10,6],[0,6]] } // Moy < 0'41
+  };
+  function noteTir(dureesMs) {
+    var s = dureesMs.map(function (d) { return d / 1000; });
+    var moy = (s[0] + s[1] + s[2]) / 3;
+    var deg;
+    if (moy > 65) deg = "D1";
+    else if (moy >= 51) deg = "D2";
+    else if (moy >= 41) deg = "D3";
+    else deg = "D4";
+    var fastest = Math.min(s[0], s[1], s[2]);
+    var slowest = Math.max(s[0], s[1], s[2]);
+    var ecart = fastest > 0 ? ((slowest - fastest) / fastest) * 100 : Infinity;
+    var bloc = BAREME_TIR[deg];
+    var note = bloc.over60;
+    if (ecart <= 60) {
+      for (var i = 0; i < bloc.steps.length; i++) {
+        if (ecart <= bloc.steps[i][0]) { note = bloc.steps[i][1]; break; }
+      }
+    }
+    return { note: note, degre: deg, moyenne: moy, ecart: ecart };
+  }
+
+  // Sexe du coureur : symbole &bull;/&circ; en fin de nom dans la liste
+  function sexeCoureur() {
+    var n = runnerSel.value || "";
+    if (n.indexOf("\u2640") >= 0) return "fille";   // ♀
+    if (n.indexOf("\u2642") >= 0) return "garcon";  // ♂
+    return null;
+  }
+
+  // ref = index du point servant de r&eacute;f&eacute;rence pour le calcul du tron&ccedil;on (-1 = d&eacute;part)
+  // dist = longueur du tron&ccedil;on chronom&eacute;tr&eacute; (m)
+  // oblig = point obligatoire (ET, ST, Arriv&eacute;e) ; les C#-###m sont informatifs/facultatifs
+  var CHECKS = [
+    { id: "ET1",     hint: "Entr&eacute;e zone de tir (fin du prologue 45 m)", oblig: true, ref: -1, dist: 45, label: "vitesse prologue" },
+    { id: "1&egrave;re validation", hint: "1&egrave;re r&eacute;ussite au tir 1 (d&eacute;clenche le d&eacute;compte de 50 s)", oblig: false, ref: 0, dist: 0, kind: "validation", n: 1 },
+    { id: "ST1",     hint: "Sortie zone de tir (fin du tir 1)", oblig: true, ref: 0, dist: 0, kind: "tir", n: 1 },
+    { id: "C1-100m", hint: "100 m, course 1", oblig: false, ref: 2, dist: 100, label: "vitesse C1-1/4" },
+    { id: "C1-200m", hint: "200 m, course 1", oblig: false, ref: 3, dist: 100, label: "vitesse C1-2/4" },
+    { id: "C1-300m", hint: "300 m, course 1", oblig: false, ref: 4, dist: 100, label: "vitesse C1-3/4" },
+    { id: "ET2",     hint: "Entr&eacute;e zone de tir (fin course 1, 385 m)", oblig: true, ref: 5, dist: 85, label: "vitesse C1-4/4" },
+    { id: "2&egrave;me validation", hint: "1&egrave;re r&eacute;ussite au tir 2 (d&eacute;clenche le d&eacute;compte de 50 s)", oblig: false, ref: 6, dist: 0, kind: "validation", n: 2 },
+    { id: "ST2",     hint: "Sortie zone de tir (fin du tir 2)", oblig: true, ref: 6, dist: 0, kind: "tir", n: 2 },
+    { id: "C2-100m", hint: "100 m, course 2", oblig: false, ref: 8, dist: 100, label: "vitesse C2-1/4" },
+    { id: "C2-200m", hint: "200 m, course 2", oblig: false, ref: 9, dist: 100, label: "vitesse C2-2/4" },
+    { id: "C2-300m", hint: "300 m, course 2", oblig: false, ref: 10, dist: 100, label: "vitesse C2-3/4" },
+    { id: "ET3",     hint: "Entr&eacute;e zone de tir (fin course 2, 385 m)", oblig: true, ref: 11, dist: 85, label: "vitesse C2-4/4" },
+    { id: "3&egrave;me validation", hint: "1&egrave;re r&eacute;ussite au tir 3 (d&eacute;clenche le d&eacute;compte de 50 s)", oblig: false, ref: 12, dist: 0, kind: "validation", n: 3 },
+    { id: "ST3",     hint: "Sortie zone de tir (fin du tir 3)", oblig: true, ref: 12, dist: 0, kind: "tir", n: 3 },
+    { id: "C3-100m", hint: "100 m, course 3", oblig: false, ref: 14, dist: 100, label: "vitesse C3-1/4" },
+    { id: "C3-200m", hint: "200 m, course 3", oblig: false, ref: 15, dist: 100, label: "vitesse C3-2/4" },
+    { id: "C3-300m", hint: "300 m, course 3", oblig: false, ref: 16, dist: 100, label: "vitesse C3-3/4" },
+    { id: "Arriv&eacute;e", hint: "Fin de l'&eacute;preuve (385 m, course 3)", oblig: true, ref: 17, dist: 85, label: "vitesse C3-4/4" }
+  ];
+  // Indices des ET / ST (apr&egrave;s insertion des boutons de validation)
+  var IDX_ET = [0, 6, 12];
+  var IDX_ST = [2, 8, 14];
+
+  var state = {
+    running: false, paused: false,
+    startTime: 0, pausedAt: 0,
+    nextOblig: 0, checkTimes: [],
+    finished: false, wakeLock: null
+  };
+
+  var chronoEl = document.getElementById("chrono");
+  var startBtn = document.getElementById("startBtn");
+  var pauseBtn = document.getElementById("pauseBtn");
+  var resetBtn = document.getElementById("resetBtn");
+  var checksEl = document.getElementById("checks");
+  var historyEl = document.getElementById("history");
+
+  var beepCtx = null;
+  function beep(freq, ms) {
+    try {
+      if (!beepCtx) beepCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var o = beepCtx.createOscillator(), g = beepCtx.createGain();
+      o.frequency.value = freq; o.connect(g); g.connect(beepCtx.destination);
+      g.gain.value = 0.15;
+      o.start(); o.stop(beepCtx.currentTime + ms / 1000);
+    } catch (e) {}
+  }
+
+  function now() { return state.paused ? state.pausedAt : Date.now(); }
+  function elapsed() { return state.running || state.paused || state.finished ? Math.max(0, now() - state.startTime) : 0; }
+  function fmt(ms) {
+    var t = Math.floor(ms);
+    var m = Math.floor(t / 60000), s = Math.floor((t % 60000) / 1000), d = Math.floor((t % 1000) / 100);
+    return (m < 10 ? "0" : "") + m + "'" + (s < 10 ? "0" : "") + s + "''" + d;
+  }
+
+  function tick() {
+    if (state.running && !state.paused) {
+      chronoEl.textContent = fmt(elapsed());
+      chronoEl.classList.remove("small");
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // Temps de r&eacute;f&eacute;rence d'un point : press&eacute; ? sinon null
+  function refTime(i) {
+    var c = CHECKS[i];
+    if (c.ref < 0) return 0; // d&eacute;part
+    return state.checkTimes[c.ref] ? state.checkTimes[c.ref].time : null;
+  }
+
+  function computeInfo(i, t) {
+    var c = CHECKS[i];
+    var r = refTime(i);
+    if (c.kind === "validation") {
+      if (r === null) return "<span class='na'>temps non calcul&eacute; (ET" + c.n + " non press&eacute;)</span>";
+      // temps (mn et sec.) depuis l'ET pr&eacute;c&eacute;dent
+      return "validation " + c.n + " : " + fmtDur(t - r) + " (depuis ET" + c.n + ")";
+    }
+    if (c.kind === "tir") {
+      var d = t - r; // r = ET du m&ecirc;me tir (toujours press&eacute; avant)
+      var m = "dur&eacute;e du tir " + c.n + " : " + fmtDur(d);
+      if (c.n >= 2) {
+        var sum = 0, cnt = 0, k;
+        for (k = 0; k < i; k++) {
+          if (CHECKS[k].kind === "tir" && state.checkTimes[k]) {
+            var dPrev = state.checkTimes[k].time - refTime(k);
+            sum += dPrev; cnt++;
+          }
+        }
+        sum += d; cnt++;
+        if (cnt >= 2) m += "<br>moyenne des tirs : " + fmtDur(sum / cnt);
+      }
+      return m;
+    }
+    if (r === null) {
+      // r&eacute;f&eacute;rence facultative manquante : calcul impossible
+      return "<span class='na'>vitesse non calcul&eacute;e (point de r&eacute;f&eacute;rence manquant)</span>";
+    }
+    return c.label + " : " + fmt1(kmh(c.dist, t - r)) + " km/h";
+  }
+
+  // Cr&eacute;ation de tous les boutons, dans l'ordre chronologique, tous visibles
+  var checkBtns = [];
+  function buildChecks() {
+    checksEl.innerHTML = "";
+    checkBtns = [];
+    CHECKS.forEach(function (c, i) {
+      var b = document.createElement("button");
+      b.className = "check" + (c.oblig ? "" : " info-btn");
+      b.innerHTML = "<span class='id'>" + c.id + "</span>" +
+        "<span class='hint'>" + c.hint + "</span>" +
+        "<span class='info'></span>" +
+        "<span class='time'></span>";
+      b.addEventListener("click", function () { pressCheck(i); });
+      checksEl.appendChild(b);
+      checkBtns.push(b);
+    });
+  }
+
+  function refreshChecks() {
+    checkBtns.forEach(function (b, i) {
+      var c = CHECKS[i];
+      var rec = state.checkTimes[i];
+      var isCurrent = state.running && !state.finished &&
+                      (c.oblig ? i === state.nextOblig : !rec);
+      b.classList.toggle("current", !!isCurrent);
+      b.classList.toggle("pressed", !!rec);
+      if (rec) {
+        b.querySelector(".info").innerHTML = rec.info;
+        b.querySelector(".time").innerHTML = "";
+      } else if (isCurrent) {
+        b.querySelector(".info").innerHTML = "";
+        b.querySelector(".time").innerHTML = c.oblig
+          ? "&#9654; &Agrave; presser"
+          : "&#9654; facultatif";
+      } else {
+        b.querySelector(".info").innerHTML = "";
+        b.querySelector(".time").innerHTML = "";
+      }
+    });
+    // D&eacute;filement : placer le bouton indiqu&eacute; en haut de la liste visible
+    scrollToBtn(checksEl.querySelector(".current"));
+  }
+  function scrollToBtn(b) {
+    if (!b) return;
+    checksEl.scrollTop = Math.max(0, b.offsetTop - checksEl.offsetTop - 4);
+  }
+
+  function pressCheck(i) {
+    if (!state.running || state.paused || state.finished) return;
+    if (state.checkTimes[i]) return; // d&eacute;j&agrave; press&eacute;
+    var c = CHECKS[i];
+    if (c.oblig) {
+      if (i !== state.nextOblig) return; // seul le point obligatoire courant est actif
+      // avance vers le prochain point obligatoire
+      var j = i + 1;
+      while (j < CHECKS.length && !CHECKS[j].oblig) j++;
+      state.nextOblig = j;
+    }
+    var t = elapsed();
+    var info = computeInfo(i, t);
+    // A l'Arriv&eacute;e : calcul des deux notes (course et tir)
+    if (i === CHECKS.length - 1) {
+      var sexe = sexeCoureur();
+      var nC = noteCourse(t, sexe);
+      var nCtxt = "note course : " + fmtNote(nC) + "/6" +
+        (sexe ? " (bar&egrave;me " + (sexe === "fille" ? "filles" : "gar&ccedil;ons") + ")" :
+                " (bar&egrave;me gar&ccedil;ons par d&eacute;faut, sexe non renseign&eacute;)");
+      var dures = [0, 1, 2].map(function (k) {
+        var et = state.checkTimes[IDX_ET[k]];  // ET1, ET2, ET3
+        var st = state.checkTimes[IDX_ST[k]];  // ST1, ST2, ST3
+        return st.time - et.time;
+      });
+      var tir = noteTir(dures);
+      var nTtxt = "note tir : " + fmtNote(tir.note) + "/6" +
+        " (degr&eacute; " + tir.degre + ", moyenne " + fmtDur(tir.moyenne * 1000) +
+        ", &eacute;cart " + Math.round(tir.ecart) + "%)";
+      info += "<br>" + nCtxt + "<br>" + nTtxt;
+      state.notes = { course: nC, tir: tir.note, texte: nCtxt + " | " + nTtxt };
+    }
+    state.checkTimes[i] = { id: c.id, time: t, info: info };
+    beep(1200, 120);
+    refreshChecks();
+    // Le dernier bouton press&eacute; est plac&eacute; en haut de la liste d&eacute;filante
+    scrollToBtn(checkBtns[i]);
+    if (c.oblig && i === CHECKS.length - 1) finishRun();
+  }
+
+  function finishRun() {
+    state.running = false; state.finished = true;
+    pauseBtn.style.display = "none";
+    beep(1400, 200); setTimeout(function(){ beep(1800, 300); }, 220);
+    saveHistory(fmt(elapsed()));
+    if (state.wakeLock) { try { state.wakeLock.release(); } catch (e) {} state.wakeLock = null; }
+  }
+
+  function saveHistory(total) {
+    try {
+      var h = JSON.parse(localStorage.getItem("lr_history") || "[]");
+      h.unshift({ date: new Date().toLocaleString("fr-FR"), runner: runnerSel.value || "—",
+                  total: total,
+                  notes: state.notes ? state.notes.texte : null });
+      h = h.slice(0, 5);
+      localStorage.setItem("lr_history", JSON.stringify(h));
+      renderHistory();
+    } catch (e) {}
+    sendResult(total);
+  }
+
+  // ---- Envoi automatique des r&eacute;sultats vers Google Sheets (Apps Script Web App) ----
+  // Renseigner l'URL du Web App d&eacute;ploy&eacute; (D&eacute;ployer > Nouveau d&eacute;ploiement > Web app)
+  var RESULTS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbx3DwzN29g-J7U6ky937YUmu84_dhfnFZuYIAjC6IerMdTxiaMM4_bqNlHmelKqh1ux/exec"; // ex: https://script.google.com/macros/s/AKfycb.../exec
+
+  function buildResultPayload(total, totalMs) {
+    var durs = [0, 1, 2].map(function (k) {
+      var et = state.checkTimes[IDX_ET[k]], st = state.checkTimes[IDX_ST[k]];
+      return st && et ? st.time - et.time : null;
+    });
+    var tir = durs.every(function (d) { return d !== null; }) ? noteTir(durs) : null;
+    var sexe = sexeCoureur();
+    var p = {
+      horodatage: new Date().toLocaleString("fr-FR"), // 1re colonne : date et heure du r&eacute;sultat
+      coureur: runnerSel.value || "",
+      sexe: sexe === "fille" ? "F" : (sexe === "garcon" ? "M" : ""),
+      temps: total,
+      tempsMs: Math.round(totalMs),
+      noteCourse: state.notes ? state.notes.course : noteCourse(totalMs, sexe),
+      noteTir: tir ? tir.note : "",
+      degreTir: tir ? tir.degre : "",
+      moyenneTirs: tir ? fmtDur(tir.moyenne * 1000) : "",
+      ecartMax: tir ? Math.round(tir.ecart) : "",
+      passages: {}
+    };
+    state.checkTimes.forEach(function (c) {
+      p.passages[c.id.replace(/&eacute;/g, "\u00e9")] = fmt(c.time);
+    });
+    return p;
+  }
+
+  function sendResult(total) {
+    if (!state.notes && !total) return;
+    var payload = buildResultPayload(total, elapsed());
+    if (!RESULTS_WEBAPP_URL) { queueResult(payload); setStatus("Envoi impossible : URL du Web App non configur&eacute;e", true); return; }
+    fetch(RESULTS_WEBAPP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); setStatus("R&eacute;sultat envoy&eacute; \u2713"); flushQueue(); })
+      .catch(function () { queueResult(payload); setStatus("R&eacute;sultat en attente d'envoi (hors ligne)", true); });
+  }
+
+  function queueResult(p) {
+    try {
+      var q = JSON.parse(localStorage.getItem("lr_pending") || "[]");
+      q.push(p);
+      localStorage.setItem("lr_pending", JSON.stringify(q));
+    } catch (e) {}
+  }
+  function flushQueue() {
+    if (!RESULTS_WEBAPP_URL) return;
+    var q;
+    try { q = JSON.parse(localStorage.getItem("lr_pending") || "[]"); } catch (e) { return; }
+    if (!q.length) return;
+    var sent = 0;
+    Promise.all(q.map(function (p) {
+      return fetch(RESULTS_WEBAPP_URL, {
+        method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(p)
+      }).then(function (r) { if (r.ok) sent++; });
+    })).then(function () {
+      try { localStorage.setItem("lr_pending", "[]"); } catch (e) {}
+      if (sent) setStatus(sent + " r&eacute;sultat(s) en attente envoy&eacute;(s) \u2713");
+    }).catch(function () {});
+  }
+  function setStatus(msg, warn) {
+    var el = document.getElementById("sendStatus");
+    if (!el) return;
+    el.innerHTML = msg;
+    el.style.color = warn ? "#f97316" : "#22c55e";
+    el.style.display = "block";
+  }
+  function renderHistory() {
+    try {
+      var h = JSON.parse(localStorage.getItem("lr_history") || "[]");
+      if (!h.length) { historyEl.style.display = "none"; return; }
+      historyEl.style.display = "block";
+      var html = "<h2>5 derniers r&eacute;sultats</h2>";
+      h.forEach(function (r) {
+        html += "<div class='hist'><span>" + r.date + " &mdash; <b>" + r.runner + "</b></span><span><b>" + r.total + "</b></span></div>";
+        if (r.notes) html += "<div class='hist' style='color:#22c55e'><span>" + r.notes + "</span><span></span></div>";
+      });
+      historyEl.innerHTML = html;
+    } catch (e) {}
+  }
+
+  startBtn.addEventListener("click", function () {
+    if (state.running) return;
+    if (state.finished || state.checkTimes.length) reset(true);
+    state.running = true; state.paused = false;
+    state.startTime = Date.now();
+    startBtn.style.display = "none";
+    beep(880, 120);
+    pauseBtn.style.display = "block";
+    refreshChecks();
+    if (navigator.wakeLock) {
+      navigator.wakeLock.request("screen").then(function (wl) { state.wakeLock = wl; }).catch(function () {});
+    }
+  });
+
+  pauseBtn.addEventListener("click", function () {
+    if (!state.running) return;
+    // Arr&ecirc;t d&eacute;finitif de l'&eacute;preuve : le chrono se fige &agrave; l'heure courante
+    state.pausedAt = Date.now();
+    state.paused = true;
+    state.running = false;
+    pauseBtn.style.display = "none";
+    var cur = checksEl.querySelector(".current");
+    if (cur) { cur.classList.remove("current"); cur.querySelector(".time").innerHTML = ""; }
+    if (state.wakeLock) { try { state.wakeLock.release(); } catch (e) {} state.wakeLock = null; }
+    beep(400, 250);
+  });
+
+  resetBtn.addEventListener("click", function () { reset(false); });
+
+  function reset(silent) {
+    if (state.wakeLock) { try { state.wakeLock.release(); } catch (e) {} }
+    state = { running: false, paused: false, startTime: 0, pausedAt: 0,
+              nextOblig: 0, checkTimes: [], finished: false, wakeLock: null, notes: null };
+    chronoEl.textContent = "00'00''0";
+    chronoEl.classList.add("small");
+    startBtn.style.display = "block";
+    startBtn.innerHTML = "D&Eacute;PART";
+    pauseBtn.style.display = "none";
+    buildChecks();
+    if (!silent) renderHistory();
+  }
+
+  buildChecks();
+  loadRunners();
+  flushQueue();
+  renderHistory();
+  tick();
+
+  // ===================== Bar&egrave;mes =====================
+  var modalOverlay = document.getElementById("modalOverlay");
+  var modalBox = document.getElementById("modalBox");
+
+  function baremeModal() {
+    var h = "<h3>Bar&egrave;me chrono de la course globale (note /6)</h3>" +
+        "<table><tr><th>Temps gar&ccedil;ons</th><th>Note</th><th>Temps filles</th><th>Note</th></tr>";
+    var g = BAREME_COURSE.garcons, f = BAREME_COURSE.filles;
+    for (var i = 0; i < g.length; i++) {
+      h += "<tr><td>" + fmtDur(g[i][0] * 1000) + "</td><td>" + fmtNote(g[i][1]) +
+           "</td><td>" + fmtDur(f[i][0] * 1000) + "</td><td>" + fmtNote(f[i][1]) + "</td></tr>";
+    }
+    h += "</table><h3>Bar&egrave;me efficacit&eacute; du tir (note /6)</h3>";
+    h += "<table><tr><th>Degr&eacute;</th><th>Moyenne des 3 tirs</th>";
+    var ecarts = ["&gt; 60%","60%","40%","30%","20%","15%","10%","0%"];
+    for (var e = 0; e < ecarts.length; e++) h += "<th>" + ecarts[e] + "</th>";
+    h += "</tr>";
+    var degs = [["D1","&gt; 1'05''"],["D2","0'51'' &ndash; 1'05''"],["D3","0'41'' &ndash; 0'50''"],["D4","&lt; 0'41''"]];
+    degs.forEach(function (d) {
+      var b = BAREME_TIR[d[0]];
+      h += "<tr><td><b>" + d[0] + "</b></td><td>" + d[1] + "</td>";
+      var vals = {};
+      vals["&gt; 60%"] = b.over60;
+      b.steps.forEach(function (s) { vals[s[0] + "%"] = s[1]; });
+      for (var k = 0; k < ecarts.length; k++) {
+        var v = vals[ecarts[k]];
+        h += "<td>" + (v === undefined ? "&mdash;" : fmtNote(v)) + "</td>";
+      }
+      h += "</tr>";
+    });
+    h += "</table><p style='font-size:12px;color:#475569'>&Eacute;cart max = (tir le plus lent &minus; tir le plus rapide) / tir le plus rapide.</p>";
+    h += "<button id='modalClose'>Fermer</button>";
+    modalBox.innerHTML = h;
+    modalOverlay.classList.add("open");
+    document.getElementById("modalClose").addEventListener("click", function () {
+      modalOverlay.classList.remove("open");
+    });
+  }
+  document.getElementById("baremeBtn").addEventListener("click", baremeModal);
+
+  // ===================== R&eacute;cap PDF =====================
+  // Vitesse d'un tron&ccedil;on (null si point manquant)
+  function segSpeed(i) {
+    var c = CHECKS[i], rec = state.checkTimes[i], r = refTime(i);
+    if (!rec || r === null || c.kind === "tir" || c.ref < 0) return null;
+    return kmh(c.dist, rec.time - r);
+  }
+  var COURSES = {
+    "C1": { color: "#2563eb", idx: [3, 4, 5, 6] },
+    "C2": { color: "#16a34a", idx: [9, 10, 11, 12] },
+    "C3": { color: "#9333ea", idx: [15, 16, 17, 18] }
+  };
+
+  function chartSVG() {
+    var W = 480, H = 300, L = 46, R = 14, T = 18, B = 36;
+    var plotW = W - L - R, plotH = H - T - B;
+    function X(q) { return L + q * (plotW / 3); }
+    function Y(v) { v = Math.max(5, Math.min(25, v)); return T + (25 - v) / 20 * plotH; }
+    var s = "<svg xmlns='http://www.w3.org/2000/svg' width='" + W + "' height='" + H + "' viewBox='0 0 " + W + " " + H + "'>";
+    s += "<rect width='" + W + "' height='" + H + "' fill='#ffffff'/>";
+    // grille horizontale + axe y (5 -> 25 km/h)
+    for (var v = 5; v <= 25; v += 5) {
+      s += "<line x1='" + L + "' y1='" + Y(v) + "' x2='" + (W - R) + "' y2='" + Y(v) +
+           "' stroke='#e2e8f0' stroke-width='1'/>";
+      s += "<text x='" + (L - 6) + "' y='" + (Y(v) + 4) + "' font-size='11' fill='#475569' text-anchor='end'>" + v + "</text>";
+    }
+    s += "<text x='" + (L - 34) + "' y='" + (T + plotH / 2) + "' font-size='11' fill='#475569' transform='rotate(-90 " + (L - 34) + " " + (T + plotH / 2) + ")' text-anchor='middle'>Vitesse (km/h)</text>";
+    // axe x : quarts de course
+    var qs = ["1/4", "2/4", "3/4", "4/4"];
+    for (var q = 0; q < 4; q++) {
+      s += "<text x='" + X(q) + "' y='" + (H - B + 16) + "' font-size='11' fill='#475569' text-anchor='middle'>" + qs[q] + "</text>";
+    }
+    s += "<line x1='" + L + "' y1='" + (T + plotH) + "' x2='" + (W - R) + "' y2='" + (T + plotH) + "' stroke='#94a3b8' stroke-width='1'/>";
+    // courbes liss&eacute;es par course
+    var all = [];
+    Object.keys(COURSES).forEach(function (k) {
+      var pts = [], speeds = COURSES[k].idx.map(function (i) { return segSpeed(i); });
+      speeds.forEach(function (v, j) { if (v !== null) { pts.push([X(j), Y(v)]); all.push(v); } });
+      if (pts.length >= 2) {
+        s += smoothPath(pts, COURSES[k].color);
+        pts.forEach(function (p) {
+          s += "<circle cx='" + p[0] + "' cy='" + p[1] + "' r='3' fill='" + COURSES[k].color + "'/>";
+        });
+      }
+    });
+    // ligne pointill&eacute;e : vitesse moyenne des trois courses
+    if (all.length) {
+      var moy = all.reduce(function (a, b) { return a + b; }, 0) / all.length;
+      s += "<line x1='" + L + "' y1='" + Y(moy) + "' x2='" + (W - R) + "' y2='" + Y(moy) +
+           "' stroke='#0f172a' stroke-width='1.5' stroke-dasharray='6 5'/>";
+      s += "<text x='" + (W - R - 4) + "' y='" + (Y(moy) - 5) + "' font-size='11' font-weight='bold' fill='#0f172a' text-anchor='end'>moyenne : " + fmt1(moy) + " km/h</text>";
+    }
+    // l&eacute;gende
+    var lx = L + 6;
+    Object.keys(COURSES).forEach(function (k) {
+      s += "<line x1='" + lx + "' y1='" + (T + 6) + "' x2='" + (lx + 18) + "' y2='" + (T + 6) + "' stroke='" + COURSES[k].color + "' stroke-width='3'/>";
+      s += "<text x='" + (lx + 22) + "' y='" + (T + 10) + "' font-size='11' fill='#0f172a'>" + k + "</text>";
+      lx += 52;
+    });
+    return s + "</svg>";
+  }
+
+  function smoothPath(pts, color) {
+    var d = "M " + pts[0][0] + " " + pts[0][1];
+    for (var i = 0; i < pts.length - 1; i++) {
+      var p0 = pts[Math.max(i - 1, 0)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(i + 2, pts.length - 1)];
+      var c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      var c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += " C " + c1x + " " + c1y + ", " + c2x + " " + c2y + ", " + p2[0] + " " + p2[1];
+    }
+    return "<path d='" + d + "' fill='none' stroke='" + color + "' stroke-width='2.5' stroke-linecap='round'/>";
+  }
+
+  function recapPDF() {
+    if (!state.checkTimes.length) { setStatus("Aucune donn&eacute;e : lancez d'abord une &eacute;preuve", true); return; }
+    var runner = runnerSel.value || "Coureur non renseign&eacute;";
+    var total = fmt(elapsed());
+    var nC = state.notes ? fmtNote(state.notes.course) : "&mdash;";
+    var nT = state.notes ? fmtNote(state.notes.tir) : "&mdash;";
+    var durs = [];
+    for (var k = 0; k < 3; k++) {
+      var et = state.checkTimes[IDX_ET[k]], st = state.checkTimes[IDX_ST[k]];
+      durs.push(et && st ? fmtDur(st.time - et.time) : "&mdash;");
+    }
+    var h = "<div id='recapPrint'>";
+    h += "<h2>R&eacute;capitulatif Laser Run</h2>";
+    h += "<div class='sub'>" + new Date().toLocaleString("fr-FR") + "</div>";
+    h += "<table>" +
+      "<tr><th>Coureur</th><td>" + runner + "</td></tr>" +
+      "<tr><th>Temps global</th><td>" + total + "</td></tr>" +
+      "<tr><th>Note course</th><td>" + nC + " /6</td></tr>" +
+      "<tr><th>Note tir</th><td>" + nT + " /6</td></tr>" +
+      "<tr><th>Dur&eacute;e tir 1 / 2 / 3</th><td>" + durs.join(" &nbsp;/&nbsp; ") + "</td></tr>" +
+      "</table>";
+    h += "<div style='text-align:center'><b>Vitesses de course par quart</b></div>";
+    h += chartSVG();
+    h += "<table><tr><th>Passage</th><th>Temps</th><th>Info</th></tr>";
+    state.checkTimes.forEach(function (c) {
+      if (c) h += "<tr><td>" + c.id + "</td><td>" + fmt(c.time) + "</td><td>" + c.info + "</td></tr>";
+    });
+    h += "</table></div>";
+    var old = document.getElementById("recapPrint");
+    if (old) old.remove();
+    document.body.insertAdjacentHTML("beforeend", h);
+    document.body.classList.add("printing");
+    setTimeout(function () { window.print(); }, 150);
+  }
+  document.getElementById("recapBtn").addEventListener("click", recapPDF);
+  window.addEventListener("afterprint", function () {
+    document.body.classList.remove("printing");
+    var r = document.getElementById("recapPrint");
+    if (r) r.remove();
+  });
+})();
+</script>
+</body>
+</html>
